@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.context.support.beans
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.BodyInserters.fromValue
+import org.springframework.web.reactive.function.server.body
 import org.springframework.web.reactive.function.server.router
 import reactor.core.publisher.Mono
 import java.time.Duration
@@ -19,8 +19,9 @@ fun main(args: Array<String>) {
             beans {
                 bean {
                     router {
-                        GET("/hello/{name}") {
-                            ok().body(fromValue("Hello ${it.pathVariable("name")}"))
+                        GET("/slow/{name}") {
+                            val service = ref<TurtleService>()
+                            ok().body(service.readySetGo(name = it.pathVariable("name")))
                         }
                     }
                 }
