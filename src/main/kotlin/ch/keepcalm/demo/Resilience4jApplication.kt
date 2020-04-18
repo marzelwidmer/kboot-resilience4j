@@ -3,7 +3,10 @@ package ch.keepcalm.demo
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
+import org.springframework.context.support.beans
 import org.springframework.stereotype.Service
+import org.springframework.web.reactive.function.BodyInserters.fromValue
+import org.springframework.web.reactive.function.server.router
 import reactor.core.publisher.Mono
 import java.time.Duration
 
@@ -11,7 +14,19 @@ import java.time.Duration
 class Resilience4jApplication
 
 fun main(args: Array<String>) {
-    runApplication<Resilience4jApplication>(*args)
+    runApplication<Resilience4jApplication>(*args){
+        addInitializers(
+            beans {
+                bean {
+                    router {
+                        GET("/hello/{name}") {
+                            ok().body(fromValue("Hello ${it.pathVariable("name")}"))
+                        }
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Service
