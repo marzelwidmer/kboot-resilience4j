@@ -1,6 +1,8 @@
 package ch.keepcalm.demo
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
+import kotlinx.coroutines.reactive.awaitFirstOrElse
+import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.cloud.circuitbreaker.resilience4j.ReactiveResilience4JCircuitBreakerFactory
@@ -13,6 +15,8 @@ import org.springframework.web.reactive.function.server.body
 import org.springframework.web.reactive.function.server.router
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.kotlin.core.publisher.toMono
+import java.lang.NullPointerException
 import java.time.Duration
 import java.time.Year
 import java.util.*
@@ -50,63 +54,64 @@ fun main(args: Array<String>) {
                     }
 
                 }
+                //  CircuitBreaker
+                bean {
+                    ReactiveResilience4JCircuitBreakerFactory().create("movie-service")
+                }
+
                 // Client
-                bean {
-                    WebClient.builder()
-                        .baseUrl("http://localhost:8080")
-                        .build()
-                }
-                bean {
-                    Customizer<ReactiveResilience4JCircuitBreakerFactory> {
-                        Customizer { factory: ReactiveResilience4JCircuitBreakerFactory ->
-                            // Default CircuitBreaker Configuration
-                            factory.configureDefault { id: String? ->
-                                Resilience4JConfigBuilder(id)
-                                    .circuitBreakerConfig(CircuitBreakerConfig.custom()
-                                        // Configures the size of the sliding window which is used to record the outcome of calls when the CircuitBreaker is closed.
-                                        .slidingWindowSize(5)
-                                        // Configures the number of permitted calls when the CircuitBreaker is half open.
-                                        .permittedNumberOfCallsInHalfOpenState(5)
-                                        // Configures the failure rate threshold in percentage
-                                        // If the failure rate is equal or greater than the threshold the CircuitBreaker transitions to open and starts short-circuiting calls.
-                                        .failureRateThreshold(50.0f)
-                                        // Configures the wait duration which specifies how long the CircuitBreaker should stay open, before it switches to half open.
-                                        // Default value is 60 seconds.
-                                        .waitDurationInOpenState(Duration.ofMillis(30))
-                                        // Configures a threshold in percentage. The CircuitBreaker considers a call as slow when the call duration is greater than
-                                        // slowCallDurationThreshold(Duration)
-                                        //  When the percentage of slow calls is equal or greater the threshold, the CircuitBreaker transitions to open and starts short-circuiting calls.
-                                        .slowCallRateThreshold(50.0F)
-                                        .build()
-                                    ).build()
-                            }
-                            factory.configure(
-                                Consumer {
-                                    Resilience4JConfigBuilder("movie-service")
-                                        .circuitBreakerConfig(CircuitBreakerConfig.custom()
-                                            // Configures the size of the sliding window which is used to record the outcome of calls when the CircuitBreaker is closed.
-                                            .slidingWindowSize(5)
-                                            // Configures the number of permitted calls when the CircuitBreaker is half open.
-                                            .permittedNumberOfCallsInHalfOpenState(1)
-                                            // Configures the failure rate threshold in percentage
-                                            // If the failure rate is equal or greater than the threshold the CircuitBreaker transitions to open and starts short-circuiting calls.
-                                            .failureRateThreshold(100.0f)
-                                            // Configures the wait duration which specifies how long the CircuitBreaker should stay open, before it switches to half open.
-                                            // Default value is 60 seconds.
-                                            .waitDurationInOpenState(Duration.ofMillis(100))
-                                            // Configures a threshold in percentage. The CircuitBreaker considers a call as slow when the call duration is greater than
-                                            // slowCallDurationThreshold(Duration)
-                                            //  When the percentage of slow calls is equal or greater the threshold, the CircuitBreaker transitions to open and starts short-circuiting calls.
-                                            .slowCallRateThreshold(200.0F)
-                                            .build())
-                                }, "movie-service")
-                        }
-                    }
-                    // readySetGo CircuitBreaker
-                    bean {
-                        ReactiveResilience4JCircuitBreakerFactory().create("movie-service")
-                    }
-                }
+//                bean {
+//                    WebClient.builder()
+//                        .baseUrl("http://localhost:8080")
+//                        .build()
+//                }
+//                bean {
+//                    Customizer<ReactiveResilience4JCircuitBreakerFactory> {
+//                        Customizer { factory: ReactiveResilience4JCircuitBreakerFactory ->
+//                            // Default CircuitBreaker Configuration
+//                            factory.configureDefault { id: String? ->
+//                                Resilience4JConfigBuilder(id)
+//                                    .circuitBreakerConfig(CircuitBreakerConfig.custom()
+//                                        // Configures the size of the sliding window which is used to record the outcome of calls when the CircuitBreaker is closed.
+//                                        .slidingWindowSize(5)
+//                                        // Configures the number of permitted calls when the CircuitBreaker is half open.
+//                                        .permittedNumberOfCallsInHalfOpenState(5)
+//                                        // Configures the failure rate threshold in percentage
+//                                        // If the failure rate is equal or greater than the threshold the CircuitBreaker transitions to open and starts short-circuiting calls.
+//                                        .failureRateThreshold(50.0f)
+//                                        // Configures the wait duration which specifies how long the CircuitBreaker should stay open, before it switches to half open.
+//                                        // Default value is 60 seconds.
+//                                        .waitDurationInOpenState(Duration.ofMillis(30))
+//                                        // Configures a threshold in percentage. The CircuitBreaker considers a call as slow when the call duration is greater than
+//                                        // slowCallDurationThreshold(Duration)
+//                                        //  When the percentage of slow calls is equal or greater the threshold, the CircuitBreaker transitions to open and starts short-circuiting calls.
+//                                        .slowCallRateThreshold(50.0F)
+//                                        .build()
+//                                    ).build()
+//                            }
+//                            factory.configure(
+//                                Consumer {
+//                                    Resilience4JConfigBuilder("movie-service")
+//                                        .circuitBreakerConfig(CircuitBreakerConfig.custom()
+//                                            // Configures the size of the sliding window which is used to record the outcome of calls when the CircuitBreaker is closed.
+//                                            .slidingWindowSize(5)
+//                                            // Configures the number of permitted calls when the CircuitBreaker is half open.
+//                                            .permittedNumberOfCallsInHalfOpenState(1)
+//                                            // Configures the failure rate threshold in percentage
+//                                            // If the failure rate is equal or greater than the threshold the CircuitBreaker transitions to open and starts short-circuiting calls.
+//                                            .failureRateThreshold(100.0f)
+//                                            // Configures the wait duration which specifies how long the CircuitBreaker should stay open, before it switches to half open.
+//                                            // Default value is 60 seconds.
+//                                            .waitDurationInOpenState(Duration.ofMillis(100))
+//                                            // Configures a threshold in percentage. The CircuitBreaker considers a call as slow when the call duration is greater than
+//                                            // slowCallDurationThreshold(Duration)
+//                                            //  When the percentage of slow calls is equal or greater the threshold, the CircuitBreaker transitions to open and starts short-circuiting calls.
+//                                            .slowCallRateThreshold(200.0F)
+//                                            .build())
+//                                }, "movie-service")
+//                        }
+//                    }
+//                }
             }
         )
     }
@@ -116,6 +121,8 @@ data class Movie(val id: String? = UUID.randomUUID().toString(), val name: Strin
 
 @Service
 class MovieService {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     private val movies = listOf(
         Movie(name = "Matrix",
@@ -134,10 +141,101 @@ class MovieService {
 
     fun randomMovie() = Mono.just(movies[kotlin.random.Random.nextInt(movies.size)])
     fun movies() = Flux.just(movies)
-    fun movieByName(name: String) = Mono.just(movies.first { it.name.toLowerCase() == name.toString().toLowerCase() })
     fun movieById(id: String) = Mono.just(movies.first { it.id == id })
 
+    fun movieByName(name: String?): Mono<Movie> {
+        val seconds = (3..10).random()
+        log.info("Service call has a delay for $seconds seconds.")
+        name?.map {
+            movies.firstOrNull() { it.name.toLowerCase() == name.toLowerCase() }?.let {
+                return Mono.just(it)
+                    .delayElement(Duration.ofSeconds(seconds.toLong()))  // Delay service call
+                    .doOnNext{
+                        log.info("Service call took $seconds seconds.")
+                    }
+            }
+        }.isNullOrEmpty().apply {
+            return Mono.error(IllegalArgumentException("Movie was not found."))
+        }
+    }
+
 }
+
+//            return Mono.just(movies.first { it.name.toLowerCase() == name.toLowerCase() })
+//                .onErrorMap {
+//                    IllegalArgumentException("The original exception was $it.localizedMessage")
+//                }
+//                .onErrorResume {
+//                    println(it)
+//                    Mono.empty()
+//
+////                    when (it) {
+////                        is IllegalArgumentException -> Mono.just(it.message.toString())
+////                        else -> Mono.just("Ooopss !!! $it.message ")
+////                    }
+//                }
+
+//                .delayElement(Duration.ofSeconds(seconds.toLong()))
+//
+//        }.isNullOrEmpty().apply {
+//            return Mono.just(Movie(name = "Fallback", year = Year.now(), description = "CircuitBeaker")) // Mono.error(NullPointerException())
+//        }
+//    }
+
+
+//        val theMovie = movies.firstOrNull { it.name == name }
+//             .run {
+//                 println(this)
+//                 Mono.just(this!!)
+//             }
+//
+//        return Mono.error(NullPointerException())
+//        return when {
+//            movies.any { it.name == name } -> Mono.just(it)
+//            else -> Mono.error(NullPointerException())
+//        }
+
+
+//    fun movieByName(name: String): Mono<Movie> {
+//
+//
+//        when (name){
+//
+//        }
+//        movies.firstOrNull {
+//
+//           it.name.toLowerCase() == name.toLowerCase()
+//
+//       }
+//
+//
+//
+//        name.takeIf {
+//            it.toLowerCase() == name
+//        }?.map {
+//
+//        }
+//
+//        movies.first {
+//            it.name.toLowerCase() == name.toLowerCase()
+//        }
+//
+//
+//        val movie = movies.first { it.name.toLowerCase() == name.toString().toLowerCase() }
+//
+//        val foo = Mono.just(
+//            movies.first {
+//                it.name.toLowerCase() == name.toString().toLowerCase()
+//            }
+//        )
+//
+//        val numbers = listOf("one", "two", "three", "four", "five", "six")
+//        println(movies.firstOrNull { it.name.toLowerCase() == name.toLowerCase() })
+//
+//
+//        return foo
+//    }
+
 
 //
 //@Component

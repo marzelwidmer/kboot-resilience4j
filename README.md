@@ -78,8 +78,16 @@ class MovieService {
 
     fun randomMovie() = Mono.just(movies[kotlin.random.Random.nextInt(movies.size)])
     fun movies() = Flux.just(movies)
-    fun movieByName(name: String) = Mono.just(movies.first { it.name.toLowerCase() == name.toString().toLowerCase() })
     fun movieById(id: String) = Mono.just(movies.first { it.id == id })
+    fun movieByName(name: String?): Mono<Movie> {
+            name?.map {
+                movies.firstOrNull() { it.name.toLowerCase() == name.toLowerCase() }?.let {
+                    return Mono.just(it)
+                }
+            }.isNullOrEmpty().apply {
+                return Mono.error(IllegalArgumentException("Movie was not found."))
+            }
+    }
 
 }
 ```
@@ -236,167 +244,49 @@ Content-Type: application/json
 ```
 
 ### Search for a not existing Movie
-Now let's also search for `Creed` is also a great movie but this one is not yet in our 'MovieService' included
+Now let's also search for `http://localhost:8080/movies/?name=Creed` is also a great movie but this one is not yet in our `MovieService` included
 we will get the following exception.
 ```bash
-http :8080/movies/creed
+http :8080/movies name=="Creed" -v
+GET /movies?name=Creed HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate
+Connection: keep-alive
+Host: localhost:8080
+User-Agent: HTTPie/2.0.0
+
 HTTP/1.1 500 Internal Server Error
-Content-Length: 206
+Content-Length: 165
 Content-Type: application/json
 
 {
     "error": "Internal Server Error",
-    "message": "Collection contains no element matching the predicate.",
-    "path": "/movies/creed",
-    "requestId": "4eac7833-10",
+    "message": "Movie was not found.",
+    "path": "/movies",
+    "requestId": "61569a89-3",
     "status": 500,
-    "timestamp": "2020-04-19T17:04:12.054+00:00"
+    "timestamp": "2020-04-19T21:13:10.403+00:00"
 }
+
 ```
 
+## Configure CircuitBreaker
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-`http :8080/hello/world`
-
-```bash
-HTTP/1.1 200 OK
-Content-Length: 11
-Content-Type: text/plain;charset=UTF-8
-
-Hello world
-```
-
-Let's call the `TurtleService` now from a Router API `/slow/{name}` for this we can get a [Bean Reference](https://docs.spring.io/spring/docs/current/kdoc-api/spring-framework/org.springframework.context.support/-bean-definition-dsl/-bean-supplier-context/ref.html)
-`val service = ref<TurtleService>()` an call our `readySetGo` function.
-```kotlin
-fun main(args: Array<String>) {
-    runApplication<Resilience4jApplication>(*args){
-        addInitializers(
-            beans {
-                bean {
-                    router {
-                        GET("/slow/{name}") {
-                            val service = ref<TurtleService>() // Bean Reference
-                            ok().body(service.readySetGo(name = it.pathVariable("name")))
-                        }
-                    }
-                }
-            }
-        )
-    }
-}
-```
-
-Let's test the new API first with a loop and call the service `50` times. 
-```bash
-for i in {1..50}; do http "http://localhost:8080/slow/Service" ; done
-
-HTTP/1.1 200 OK
-Content-Length: 55
-Content-Type: application/json
-
-{
-    "message": "Service Ready, set, go!! this call took 2"
-}
-
-HTTP/1.1 200 OK
-Content-Length: 55
-Content-Type: application/json
-
-{
-    "message": "Service Ready, set, go!! this call took 7"
-}
-
-HTTP/1.1 200 OK
-Content-Length: 55
-Content-Type: application/json
-
-{
-    "message": "Service Ready, set, go!! this call took 9"
-}
-```
-
-Let's go one step further and refactor again our code. 
-Create first a new `Bean` for the `WebClient` with this we will call our Service on Application Start.
-This will simulate our `Httpie` call from before.
+😎 Cool stuff 😎 let's implement the `CircuitBreaker` with `Resilinece4j`.
+Let's configure the `ReactiveCircuitBreaker` Bean from `ReactiveResilience4JCircuitBreakerFactory` with a name `movie-service`.
 
 ```kotlin
-// Client
 bean {
-    WebClient.builder()
-        .baseUrl("http://localhost:8080")
-        .build()
+    ReactiveResilience4JCircuitBreakerFactory()
+        .create("movie-service")
 }
-```  
-
-Then create a `Client` Spring `Component` class with the name `Client` where we inject our `WebClient`.
-We also will implement a function `ready` with a loop `for (count in 1..50)` like before on application start for this we use the Spring `EventListener`
-and the `@EventListener(classes = [ApplicationReadyEvent::class])`  annotation.
-
-```kotlin
-@Component
-class Client(private val webClient: WebClient) {
-
-    private val log = LoggerFactory.getLogger(javaClass)
-
-    @EventListener(classes = [ApplicationReadyEvent::class])
-    fun ready() {
-
-        for (count in 0..50) {
-            webClient
-                .get()
-                .uri("/slow/{name}", "[$count]CallFromEventListener")
-                .retrieve()
-                .bodyToMono(TurtleServiceResponse::class.java)
-                .map { it.message }
-                .subscribe {
-                    log.info("--> Client[$count] :  $it")
-                }
-        }
-    }
-}
-
 ```
 
-Now when we start our application again `mvn spring-boot:run` you will see in the logfile something like this hopefully.
 
-```bash
-2020-04-19 Sun 09:45:43.793 TurtleService - <-- TurtleService : TurtleServiceResponse(message=[25]CallFromEventListener Ready, set, go!! this call took 3)
-2020-04-19 Sun 09:45:43.795 Client        - --> Client[25] :  [25]CallFromEventListener Ready, set, go!! this call took 3
-```
 
-> 💡 **Logger Configuration**: 
-    logging.pattern.console: "%clr(%d{yyyy-MM-dd E HH:mm:ss.SSS}){blue} %clr(%-40.40logger{0}){magenta} - %clr(%m){green}%n" 
-    
 
-Now we configure our `WebClient` a timeout of `5 seconds` with `.timeout(Duration.ofSeconds(5.toLong()))` and start the application 
-again `mvn spring-boot:run` to see a `java.util.concurrent.TimeoutException` after a while.  
- 
-```bash
-2020-04-19 Sun 09:59:47.804 TurtleService    - <-- TurtleService : TurtleServiceResponse(message=[34]CallFromEventListener Ready, set, go!! this call took 4)
-2020-04-19 Sun 09:59:47.805 Client           - --> Client[34] :  [34]CallFromEventListener Ready, set, go!! this call took 4
-2020-04-19 Sun 09:59:48.522 Schedulers       - Scheduler worker in group main failed with an uncaught exception
-reactor.core.Exceptions$ErrorCallbackNotImplemented: java.util.concurrent.TimeoutException: Did not observe any item or terminal signal within 5000ms in 'map' (and no fallback has been configured)
-Caused by: java.util.concurrent.TimeoutException: Did not observe any item or terminal signal within 5000ms in 'map' (and no fallback has been configured)
-	at reactor.core.publisher.FluxTimeout$TimeoutMainSubscriber.handleTimeout(FluxTimeout.java:289) ~[reactor-core-3.3.4.RELEASE.jar:3.3.4.RELEASE]
-	at reactor.core.publisher.FluxTimeout$TimeoutMainSubscriber.doTimeout(FluxTimeout.java:274) ~[reactor-core-3.3.4.RELEASE.jar:3.3.4.RELEASE]
-	at reactor.core.publisher.FluxTimeout$TimeoutTimeoutSubscriber.onNext(FluxTimeout.java:396) ~[reactor-core-3.3.4.RELEASE.jar:3.3.4.RELEASE]
-```
+
+
 
 😎 Cool stuff 😎 let's implement the `CircuitBreaker` with `Resilinece4j`. 
 
@@ -408,44 +298,16 @@ bean {
         .create("readySetGo")
 }
 ```
-
-That Bean will be also injected in our `Client` class `private val circuitBreaker: ReactiveCircuitBreaker`
-```kotlin
-class Client(private val webClient: WebClient, private val circuitBreaker: ReactiveCircuitBreaker)
-```
-
-Let's define now our Pipeline with the `CircuitBreaker` `run` function and implement a dummy implementation with a log statment when the `CircuitBreaker` is open.
-`Mono.just("Ooopss CircuitBreaker  is [OPEN ]!!! $it.message ")`
-
-```kotlin
-circuitBreaker.run(
-            webClient
-                .get()
-                .uri("/slow/{name}", "[$count]CallFromEventListener")
-                .retrieve()
-                .bodyToMono(TurtleServiceResponse::class.java)
-                .map { it.message }
-                .timeout(Duration.ofSeconds(5.toLong()))
-
-        ) { // it: Throwable
-            Mono.just("Ooopss CircuitBreaker !!! $it ")
-        }
-            .subscribe { log.info("--> Client[$count] :  $it") }
-```
-
-so far we haven't got a better result.  
-```bash
-2020-04-19 Sun 10:30:35.105 Client - --> Client[4] :  [4]CallFromEventListener Ready, set, go!! this call took 0
-2020-04-19 Sun 10:30:35.733 Client - --> Client[0] :  CircuitBreaker is [OPEN ]!!! java.util.concurrent.TimeoutException: Did not observe any item or terminal signal within 1000ms in 'circuitBreaker' (and no fallback has been configured)
-```
- 
-
-
+  
 
 
 The example source code can be found here [GitHub](https://github.com/marzelwidmer/kboot-resilience4j)
 
 
+
+> 💡 **Logger Configuration**: 
+    logging.pattern.console: "%clr(%d{yyyy-MM-dd E HH:mm:ss.SSS}){blue} %clr(%-40.40logger{0}){magenta} - %clr(%m){green}%n" 
+    
 
 > **_References:_**  
 >[Resilience4j docs](https://resilience4j.readme.io/docs)
