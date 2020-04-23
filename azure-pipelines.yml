@@ -18,8 +18,8 @@ steps:
     versionSpec: "11"
     jdkArchitectureOption: x64
     jdkSourceOption: LocalDirectory
-    jdkFile: "/builds/openjdk-11.0.2_linux-x64_bin.tar.gz"
-    jdkDestinationDirectory: "/builds/binaries/externals"
+    jdkFile: "$HOME/dev/azure/builds/openjdk-11.0.2_osx-x64_bin.tar.gz"
+    jdkDestinationDirectory: "$HOME/dev/azure/builds/binaries/externals"
     cleanDestinationDirectory: true
 - task: Maven@3
   inputs:
