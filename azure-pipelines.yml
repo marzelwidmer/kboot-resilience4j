@@ -18,8 +18,8 @@ steps:
     versionSpec: "11"
     jdkArchitectureOption: x64
     jdkSourceOption: LocalDirectory
-    jdkFile: "/Users/morpheus/dev/azure/agent/builds/openjdk-11.0.2_osx-x64_bin.tar.gz"
-    jdkDestinationDirectory: "/Users/morpheus/dev/azure/agent/builds/binaries/externals"
+    jdkFile: "/Users/morpheus/dev/azure/agent/openjdk-11.0.2_osx-x64_bin.tar.gz"
+    jdkDestinationDirectory: "/Users/morpheus/dev/azure/agent/binaries/externals"
     cleanDestinationDirectory: true
 - task: Maven@3
   inputs:
