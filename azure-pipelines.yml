@@ -19,7 +19,7 @@ steps:
   inputs:
     versionSpec: '1.11'
     jdkArchitectureOption: # Options: x64, x86
-    jdkSourceOption: # Options: AzureStorage, LocalDirectory
+    jdkSourceOption: LocalDirectory # Options: AzureStorage, LocalDirectory
     #jdkFile: # Required when jdkSourceOption == LocalDirectory
     #azureResourceManagerEndpoint: # Required when jdkSourceOption == AzureStorage
     #azureStorageAccountName: # Required when jdkSourceOption == AzureStorage
