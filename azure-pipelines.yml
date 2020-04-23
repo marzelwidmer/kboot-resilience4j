@@ -8,7 +8,8 @@ trigger:
 
 
 pool:
-  vmImage: 'ubuntu-latest'
+#  vmImage: 'ubuntu-latest'
+  name: MacBook-AzureDevOpsAgent-Token
 
 steps:
 - task: Maven@3
